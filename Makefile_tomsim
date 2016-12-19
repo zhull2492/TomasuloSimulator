@@ -1,0 +1,32 @@
+CC := g++ 
+SRCDIR := src/tomsim
+BUILDDIR := build/tomsim
+COMDIR := common
+TARGET := bin/tomsim
+ 
+SRCEXT := cpp
+SOURCES := $(shell find $(SRCDIR) -type f -name *.$(SRCEXT))
+COMMON := $(shell find $(COMDIR) -type f -name *.$(SRCEXT))
+OBJECTS := $(patsubst $(SRCDIR)/%,$(BUILDDIR)/%,$(SOURCES:.$(SRCEXT)=.o))
+COMOBJ := $(patsubst $(COMDIR)/%,$(COMDIR)/%,$(COMMON:.$(SRCEXT)=.o))
+CFLAGS := -g -std=c++11
+LIB := -ljsoncpp 
+INC := -I include
+
+$(COMDIR)/%.o: $(COMDIR)/%.$(SRCEXT)
+	@echo " $(CC) $(CFLAGS) $(INC) -c -o $@ $<"; $(CC) $(CFLAGS) $(INC) -c -o $@ $<
+
+$(TARGET): $(OBJECTS) 
+	@echo " Linking..."
+	@echo " $(CC) $^ -o $(TARGET) $(LIB)"; $(CC) $^ -o $(TARGET) $(LIB)
+
+$(BUILDDIR)/%.o: $(SRCDIR)/%.$(SRCEXT)
+	@mkdir -p $(BUILDDIR)
+	@echo " $(CC) $(CFLAGS) $(INC) -c -o $@ $<"; $(CC) $(CFLAGS) $(INC) -c -o $@ $<
+
+
+clean:
+	@echo " Cleaning..."; 
+	@echo " $(RM) -r $(BUILDDIR) $(TARGET)"; $(RM) -r $(BUILDDIR) $(TARGET)
+
+.PHONY: clean
