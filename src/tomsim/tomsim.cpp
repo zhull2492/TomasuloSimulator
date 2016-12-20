@@ -1,3 +1,11 @@
+// //////////////////////////////////////////////////////////////////
+// Filename: tomsim.cpp
+// Description: This file implements a simulattion of Tomasulo's 
+//		algorithm for dynamic instruction scheduling
+// Author: ZDHull
+// Date: 2016/12/19
+// //////////////////////////////////////////////////////////////////
+
 #include <stdio.h>
 #include <fstream>
 #include <iostream>
@@ -7,6 +15,7 @@
 
 #define NUMREGS 8
 #define FILE_SIZE 300
+
 #define DEBUG
 
 using namespace std;
@@ -94,6 +103,8 @@ void writeResults(char * filename, int clockcycles);
 
 // ///////////////////////////////////////////////////////////////////////
 // Local Functions
+
+// Print out the list of instructions for the program
 void printInst () {
     instNode * current;
 
@@ -109,10 +120,13 @@ void printInst () {
     return;
 }
 
+// Add node to linked list for new instruction
 void addInst (string op, int unit, string ar1 = "", string ar2 = "", string ar3 = "") {
    
+    // Create a node
     instNode * newNode = new instNode;
 
+    // Copy the values to node
     newNode -> op = op;
     newNode -> funit = unit;
     newNode -> arg1 = ar1;
@@ -121,36 +135,36 @@ void addInst (string op, int unit, string ar1 = "", string ar2 = "", string ar3 
 
     numInst++;
 
+    // Empty List
     if (head == NULL) {
 	head = newNode;
 	tail = newNode;
     }
+    // Always add to end
     else {
 	tail -> next = newNode;
 	tail = newNode;
     }
 
-    printInst();
-
-    cout << "-------------" << endl;
-
     return;
 }
 
+// Delete the nodes in a linked list
 void clearInst () {
 
     instNode * current;
 
+    // Until list is empty
     while (head != NULL) {
+	// Done?
 	if (tail == head) {
 	    tail = NULL;
 	}
+	// Adjust pointers and delete
 	current = head;
 	head = current -> next;
 	current -> next = NULL;
  	delete current;
-	printInst();
-	cout << "------------" << endl << endl;
     }
 
     return;
@@ -158,32 +172,37 @@ void clearInst () {
 
 int main (int argc, char *argv[]) {
 
-    ifstream tracefile;
-    string line;
-    string op;
-    string instargs[3];
-    string rd, rs, rt, imm8;
-    instNode * currentInst = NULL;
+    ifstream tracefile;			// Input Trace
+    string line;			// Line
+    string op;				// Instruction
+    string instargs[3];			
+    string rd, rs, rt, imm8;		// Register numbers and immediate
+    instNode * currentInst = NULL;	// Pointers to instructions
     instNode * roInst = NULL;
-    char inputfile[FILE_SIZE];
-    int clockcycles;
+    char inputfile[FILE_SIZE];		// Input trace name
+    int clockcycles;			// Number of clock cycles
 
     if (argc != 4) {
 	cout << "Usage Error: " << argv[0] << " trace_file configuration output_file" << endl;
 	return 0;
     }
 
+    // Copy trace file name
     strcpy(inputfile, argv[1]);
 
+    // Open file
     tracefile.open(inputfile);
 
+    // Check if file is open
     if (!tracefile.is_open()) {
 	cout << "Trace File not open...terminating" << endl;
 	return 0;
     }
 
+    // Read the configuration file
     readConfig(argv[2]);
 
+    // Initialize dynamic variables based on config file
     intstation = new idmstation [numIntRes];
     divstation = new idmstation [numDivRes];
     multstation = new idmstation [numMultRes];
@@ -197,7 +216,9 @@ int main (int argc, char *argv[]) {
 
     op[0] = '\0';
 
+    // Start reading the tracefile
     while (op != "HALT") {
+	// Read operation from line and add new linked list node according to type
 	tracefile >> op;
 	if ((op == "ADD") || (op == "SUB") || (op == "NOR") || (op == "AND")) {
 	    tracefile >> rd;
@@ -242,21 +263,25 @@ int main (int argc, char *argv[]) {
 	}
     }
 
+#ifdef DEBUG
+    printInst();
     cout << "Inst: " << numInst << endl << endl;
+#endif
 
     tracefile.close();
 
     currentInst = head;
 
-    int i;
-    int newIssue = 0;
+    int i;		// Counting Variable
+    int newIssue = 0;	// Flags
     int allowRO = 0;
-    clockcycles = 0;
-    regreads = 0;
-    keepIssue = 1;
+    clockcycles = 0;	// Set clock cycles
+    regreads = 0;	// Set register reads
+    keepIssue = 1;	// Flag
 
     printStations();
 
+    // Start Scheduling
     while (1) {
 	// Read Operand
 	if (allowRO) {
@@ -562,6 +587,7 @@ int main (int argc, char *argv[]) {
 	    }
 	}
 
+	// If new issue, get ready for the next cycle
 	if (newIssue == 1) {
 	    roInst = currentInst;
 	    roStation = currStation;
@@ -622,8 +648,10 @@ int main (int argc, char *argv[]) {
 	}
 
 	// END
+#ifdef DEBUG
 	printStations();
 	cout << "Clock Cycles: " << clockcycles + 1 << endl << endl;
+#endif
 
 	clockcycles++;
 
@@ -632,15 +660,19 @@ int main (int argc, char *argv[]) {
 	}
     }
 
+    // Clear the list
     clearInst();
 
+    // Print some stuff
     cout << endl << "Num Clock Cycles: " << clockcycles << endl;
     printFU();
     cout << "Register Reads: " << regreads << endl;
     cout << "Pipeline Stall: " << stalls << endl;
 
+    // Write the output
     writeResults(argv[3], clockcycles);
 
+    // Delete
     delete[] intstation;
     delete[] divstation;
     delete[] multstation;
@@ -655,6 +687,7 @@ int main (int argc, char *argv[]) {
     return 0;
 }
 
+// Print the register renamed values
 void printrename() {
 
     for (int i = 0; i < NUMREGS; ++i) {
@@ -664,6 +697,7 @@ void printrename() {
     return;
 }
 
+// Search renamed registers for key value
 int findrename(string regName) {
 
     if (renamereg[regName[1]-'0'].empty()) {
@@ -677,6 +711,7 @@ int findrename(string regName) {
 
 }
 
+// Print the current status of all reservation stations
 void printStations() {
 
     int i;
@@ -704,6 +739,7 @@ void printStations() {
     return;
 }
 
+// Check to see if instruction has all operands to execute
 void checkOperand(int clockcycles) {
 
     int i;
@@ -758,6 +794,7 @@ void checkOperand(int clockcycles) {
     return;
 }
 
+// Find the oldest instruction waiting to execute
 int findOldest(int unit, int numRes, int unitID, int latency, int clockcycles) {
 
     idmstation * oldInst;
@@ -808,6 +845,7 @@ int findOldest(int unit, int numRes, int unitID, int latency, int clockcycles) {
     return 0;
 }
 
+// Check functional unit
 void checkFU(int unit, int clockcycles){
 
     int numUnits;
@@ -857,7 +895,6 @@ void checkFU(int unit, int clockcycles){
 	    if(findOldest(unit, numRes, i, latencyval, clockcycles)) {
 		fuptr -> inUse = 1;
 		(fuptr -> count)++;
-//		return;
 	    }
 	}
 	fuptr = fuptr + 1;
@@ -866,6 +903,7 @@ void checkFU(int unit, int clockcycles){
     return;
 }
 
+// Broadcast on CDB
 void writebackCDB(idmstation * cStation, string resID){
 
     int i;
@@ -962,6 +1000,7 @@ void writebackCDB(idmstation * cStation, string resID){
     return;
 }
 
+// Check to see if instruction finishes
 int checkFinish() {
 
     int i;
@@ -1000,6 +1039,7 @@ int checkFinish() {
 
 }
 
+// Print the Functional Unit
 void printFU() {
 
     int i = 0;
@@ -1023,6 +1063,7 @@ void printFU() {
     return;
 }
 
+// Read the configuration file
 void readConfig(char filename[FILE_SIZE]) {
 
     ifstream configfile;
@@ -1077,6 +1118,7 @@ void readConfig(char filename[FILE_SIZE]) {
     return;
 }
 
+// Write the results
 void writeResults(char * filename, int clockcycles) {
 
     ofstream outfile;
